@@ -1,0 +1,12 @@
+diff -ru nginx-release-1.29.2/auto/unix nginx-release-1.29.2-qnx/auto/unix
+--- nginx-release-1.29.2/auto/unix	2025-10-07 17:04:07.000000000 +0000
++++ nginx-release-1.29.2-qnx/auto/unix	2025-10-16 20:43:11.000000000 +0000
+@@ -1011,7 +1011,7 @@
+ ngx_feature_run=no
+ ngx_feature_incs="#include <sys/types.h>
+                   #include <sys/stat.h>
+-                  #include <fcntl.h>"
++                  #include <fcntl_no.h>"
+ ngx_feature_path=
+ ngx_feature_libs=
+ ngx_feature_test="struct stat sb;

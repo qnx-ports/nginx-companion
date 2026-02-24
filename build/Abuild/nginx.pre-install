@@ -1,0 +1,8 @@
+#!/bin/sh
+
+addgroup -Sg 82 www-data
+addgroup -S nginx
+adduser -S -D -H -h /var/lib/nginx -s /bin/nologin -G nginx -g nginx nginx
+addgroup nginx www-data
+
+exit 0

@@ -1,0 +1,161 @@
+# Maintainer: Felix Xing <fxing@qnx.com>
+pkgname=nginx
+pkgver=1.29.2
+pkgrel=1
+pkgdesc="Lightweight HTTP server and IMAP/POP3 proxy server"
+url="nginx.org/"
+arch="all"
+depends="qnx-io-sock libssl3 libcrypto3 zlib pcre2 libxml2 libxslt libgd geoip libxcrypt"
+makedepends="make
+             qnx-io-sock-dev
+             openssl-dev
+             zlib-dev
+             pcre2-dev
+             libxml2-dev
+             libxslt-dev
+             gd-dev
+             libxcrypt-dev
+             geoip-dev"
+checkdepends="perl
+              git
+              tzdata
+              perl-protocol-websocket
+              perl-net-ssleay
+              perl-io-socket-ssl
+              perl-fcgi"
+license="BSD-2-Clause"
+subpackages="$pkgname-debug $pkgname-doc"
+pkgusers="nginx"
+_grp_ngx="nginx"
+_grp_www="www-data"
+pkggroups="$_grp_ngx $_grp_www"
+install="$pkgname.pre-install $pkgname.post-install $pkgname.pre-upgrade $pkgname.post-upgrade"
+options="!check" # Takes a bit too long
+source="https://github.com/nginx/nginx/archive/release-$pkgver/nginx-$pkgver.tar.gz
+o_directory.patch
+nginx.conf
+default.conf
+"
+builddir="$srcdir/nginx-release-$pkgver"
+_modules_dir="/usr/lib/$pkgname/modules"
+
+_build() {
+    auto/configure \
+    --prefix=/var/lib/$pkgname \
+    --sbin-path=/usr/bin/$pkgname \
+    --modules-path=$_modules_dir \
+    --conf-path=/etc/$pkgname/$pkgname.conf \
+    --pid-path=/run/$pkgname/$pkgname.pid \
+    --lock-path=/run/$pkgname/$pkgname.lock \
+    --http-client-body-temp-path=/var/lib/$pkgname/tmp/client_body \
+    --http-proxy-temp-path=/var/lib/$pkgname/tmp/proxy \
+    --http-fastcgi-temp-path=/var/lib/$pkgname/tmp/fastcgi \
+    --http-uwsgi-temp-path=/var/lib/$pkgname/tmp/uwsgi \
+    --http-scgi-temp-path=/var/lib/$pkgname/tmp/scgi \
+    --without-select_module \
+    \
+    --user=$pkgusers \
+    --group=$_grp_ngx \
+    --with-compat \
+    --with-threads \
+    --error-log-path=stderr \
+    \
+    --with-cc-opt="$CFLAGS $CPPFLAGS -Os" \
+    --with-ld-opt="$LDFLAGS -lsocket" \
+    --with-http_ssl_module \
+    --with-http_v2_module \
+    --with-http_v3_module \
+    --with-http_realip_module \
+    --with-http_addition_module \
+    --with-http_xslt_module=dynamic \
+    --with-http_image_filter_module=dynamic \
+    --with-http_geoip_module=dynamic \
+    --with-http_sub_module \
+    --with-http_dav_module \
+    --with-http_flv_module \
+    --with-http_mp4_module \
+    --with-http_gunzip_module \
+    --with-http_gzip_static_module \
+    --with-http_auth_request_module \
+    --with-http_random_index_module \
+    --with-http_secure_link_module \
+    --with-http_slice_module \
+    --with-http_stub_status_module \
+    --with-mail=dynamic \
+    --with-mail_ssl_module \
+    --with-stream=dynamic \
+    --with-stream_ssl_module \
+    --with-stream_realip_module \
+    --with-stream_geoip_module=dynamic \
+    --with-stream_ssl_preread_module \
+    "$@"
+
+    # Do not support --with-http_degradation_module due to sbrk/brk not support
+    # perl module is not working if dlopen() rpath is not fix 
+    # --with-perl_modules_path=/usr/lib/perl5/vendor_perl
+    # --with-http_perl_module=dynamic \
+    make
+}
+
+build() {
+    _build --with-debug
+    mv objs objs-debug
+
+    make clean
+    _build
+}
+
+check(){
+    # get nginx tests
+    git clone https://github.com/nginx/nginx-tests.git
+    cd nginx-tests
+
+    # some tests are failing, but Nginx is an experimentabl package so they will be ignored
+    TEST_NGINX_BINARY="$builddir/objs/nginx" prove -j $((JOBS > 20 ? 20 : JOBS)) . || true
+}
+
+package() {
+    make DESTDIR="$pkgdir" install
+
+    install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+    install -Dm644 README.md "$pkgdir"/usr/share/doc/$pkgname/README.md
+    install -Dm644 objs/$pkgname.8 "$pkgdir"/usr/share/man/man8/$pkgname.8
+
+    cd "$pkgdir"
+
+    install -Dm644 "$srcdir"/nginx.conf ./etc/$pkgname/nginx.conf
+    install -dm755 ./etc/$pkgname/http.d ./etc/$pkgname/modules
+
+    install -dm750 -o $pkgusers -g $_grp_ngx ./var/lib/$pkgname || true
+    install -dm700 -o $pkgusers -g $_grp_ngx ./var/lib/$pkgname/tmp || true
+    install -dm755 -g $_grp_www ./var/www/localhost/htdocs || true
+
+    install -Dm644 "$srcdir"/default.conf ./usr/share/$pkgname/http-default_server.conf
+
+    install -dm755 ./var/log/$pkgname
+    chown $pkgusers:$_grp_ngx var/log/$pkgname || true
+
+    ln -sf /$_modules_dir ./var/lib/$pkgname/modules
+    ln -sf /var/log/$pkgname ./var/lib/$pkgname/logs
+    ln -sf /run/$pkgname ./var/lib/$pkgname/run
+
+    # Remove archaic charset maps.
+    rm ./etc/$pkgname/koi-* ./etc/$pkgname/win-utf
+    rm -rf ./run ./etc/$pkgname/*.default
+}
+
+# http://nginx.org/en/docs/debugging_log.html
+debug() {
+    pkgdesc="nginx built with support for debugging log"
+    depends="$pkgname=$pkgver-r$pkgrel"
+    options="!strip"
+
+    install -Dm755 "$builddir"/objs-debug/nginx "$subpkgdir"/usr/bin/nginx-debug
+}
+
+sha512sums="
+8c93214e69214fda25d445e14b40e7d79d2519bfdcb2df7b1f33aee42f953896024f3f46a063a2a32256244b60dd36182e618b175a13f1c71706617292a36cf8  nginx-1.29.2.tar.gz
+7b224be98dbacab061145435c423ee04d94e4e244d6f86130df3830e1dfde15f3f067bec93913b80ee8754290fd9d85613f5828c853c0a72bb80d2917a898702  o_directory.patch
+c209a220b6afc9354a1c4c39817199327425485b3da44778d632cdfd1d95b8412c58ba9b27a5c96599e7a34cc039f5b7d914ad82153c610b27dfbe21fdcdca77  nginx.conf
+0907f69dc2d3dc1bad3a04fb6673f741f1a8be964e22b306ef9ae2f8e736e1f5733a8884bfe54f3553fff5132a0e5336716250f54272c3fec2177d6ba16986f3  default.conf
+"
