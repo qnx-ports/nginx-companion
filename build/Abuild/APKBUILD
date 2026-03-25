@@ -1,7 +1,7 @@
 # Maintainer: Felix Xing <fxing@qnx.com>
 pkgname=nginx
 pkgver=1.29.2
-pkgrel=${pkgrel:-0}
+pkgrel=1
 pkgdesc="Lightweight HTTP server and IMAP/POP3 proxy server"
 url="nginx.org/"
 arch="all"
@@ -153,7 +153,6 @@ debug() {
     install -Dm755 "$builddir"/objs-debug/nginx "$subpkgdir"/usr/bin/nginx-debug
 }
 
-options="$options ${DISABLE_CHECK:+!check}"
 sha512sums="
 8c93214e69214fda25d445e14b40e7d79d2519bfdcb2df7b1f33aee42f953896024f3f46a063a2a32256244b60dd36182e618b175a13f1c71706617292a36cf8  nginx-1.29.2.tar.gz
 7b224be98dbacab061145435c423ee04d94e4e244d6f86130df3830e1dfde15f3f067bec93913b80ee8754290fd9d85613f5828c853c0a72bb80d2917a898702  o_directory.patch
